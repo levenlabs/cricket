@@ -42,7 +42,7 @@ func mem() (map[string]interface{}, error) {
 
 	mtot := mustParseInt(m["MemTotal"].(string))
 	mavail := mustParseInt(m["MemAvailable"].(string))
-	usedPer := float64(mtot-mavail) / float64(mavail)
+	usedPer := float64(mtot-mavail) / float64(mtot)
 
 	return map[string]interface{}{
 		"memTotalKB": mtot,
