@@ -1,7 +1,9 @@
 package main
 
 import (
+	"os/exec"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/levenlabs/go-llog"
@@ -104,6 +106,20 @@ func main() {
 		Description: "interval at which to display net stats. Blank to not show",
 		Default:     "1s",
 	})
+	l.Add(lever.Param{
+		Name:        "--ping-interval",
+		Description: "interval at which to ping hosts. Blank to not ping",
+		Default:     "1s",
+	})
+	l.Add(lever.Param{
+		Name:        "--ping-hosts",
+		Description: "comma-delimited set of hostnames or ips to ping. Blank to not ping",
+	})
+	l.Add(lever.Param{
+		Name:        "--ping-count",
+		Description: "Number of pings to send per interval",
+		Default:     "3",
+	})
 	l.Parse()
 
 	i, _ := l.ParamStr("--cpu-interval")
@@ -124,6 +140,16 @@ func main() {
 	i, _ = l.ParamStr("--net-interval")
 	if d, ok := mustParseDuration(i); ok {
 		go netLoop(d)
+	}
+
+	i, _ = l.ParamStr("--ping-interval")
+	if d, ok := mustParseDuration(i); ok {
+		hostsRaw, _ := l.ParamStr("--ping-hosts")
+		if hostsRaw != "" {
+			hosts := strings.Split(hostsRaw, ",")
+			count, _ := l.ParamInt("--ping-count")
+			go pingLoop(d, hosts, count)
+		}
 	}
 
 	select {}
@@ -198,6 +224,47 @@ func netLoop(interval time.Duration) {
 			kv := d.toKV()
 			kv["dev"] = dev
 			llog.Info("net stats (diff)", kv)
+		}
+
+		<-tick
+	}
+}
+
+type pingRes struct {
+	d   time.Duration
+	err error
+}
+
+func pingPromise(count int, addr string) chan pingRes {
+	ch := make(chan pingRes)
+	go func() {
+		start := time.Now()
+		err := exec.Command("ping", "-c"+strconv.Itoa(count), "-w5", addr).Run()
+		if err != nil {
+			ch <- pingRes{err: err}
+			return
+		}
+		ch <- pingRes{
+			d: time.Since(start) / time.Duration(count),
+		}
+	}()
+	return ch
+}
+
+func pingLoop(interval time.Duration, hosts []string, count int) {
+	for tick := time.Tick(interval); ; {
+		proms := make([]chan pingRes, len(hosts))
+		for i, host := range hosts {
+			proms[i] = pingPromise(count, host)
+		}
+
+		for i := range proms {
+			pr := <-proms[i]
+			if pr.err != nil {
+				llog.Warn("ping failed", llog.KV{"host": hosts[i], "err": pr.err})
+			} else {
+				llog.Info("ping result", llog.KV{"host": hosts[i], "took": pr.d})
+			}
 		}
 
 		<-tick
