@@ -263,7 +263,10 @@ func pingLoop(interval time.Duration, hosts []string, count int) {
 			if pr.err != nil {
 				llog.Warn("ping failed", llog.KV{"host": hosts[i], "err": pr.err})
 			} else {
-				llog.Info("ping result", llog.KV{"host": hosts[i], "took": pr.d})
+				llog.Info("ping result", llog.KV{
+					"host":   hosts[i],
+					"tookMS": pr.d.Seconds() * 1e3,
+				})
 			}
 		}
 
