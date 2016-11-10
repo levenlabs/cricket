@@ -4,6 +4,9 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"strconv"
+
+	llog "github.com/levenlabs/go-llog"
 )
 
 func mem() (map[string]interface{}, error) {
@@ -40,8 +43,16 @@ func mem() (map[string]interface{}, error) {
 		}
 	}
 
-	mtot := mustParseInt(m["MemTotal"].(string))
-	mavail := mustParseInt(m["MemAvailable"].(string))
+	parseInt := func(s string) int {
+		i, err := strconv.Atoi(s)
+		if err != nil {
+			llog.Fatal("could not parse int string", llog.KV{"str": s}, llog.ErrKV(err))
+		}
+		return i
+	}
+
+	mtot := parseInt(m["MemTotal"].(string))
+	mavail := parseInt(m["MemAvailable"].(string))
 	usedPer := float64(mtot-mavail) / float64(mtot)
 
 	return map[string]interface{}{
