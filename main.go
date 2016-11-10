@@ -178,7 +178,7 @@ func cpuLoop(ch <-chan time.Time) {
 	var doPrint bool
 	for range ch {
 		if full, diff, err = cpuDiff(full); err != nil {
-			llog.Fatal("err calling cpuDiff", llog.KV{"err": err})
+			llog.Fatal("err calling cpuDiff", llog.ErrKV(err))
 		}
 
 		if doPrint && diff != nil {
@@ -192,7 +192,7 @@ func memLoop(ch <-chan time.Time) {
 	for range ch {
 		m, err := mem()
 		if err != nil {
-			llog.Fatal("err calling mem", llog.KV{"err": err})
+			llog.Fatal("err calling mem", llog.ErrKV(err))
 		}
 		llog.Info("mem stats", llog.KV(m))
 	}
@@ -202,7 +202,7 @@ func diskLoop(ch <-chan time.Time) {
 	for range ch {
 		dd, err := disk()
 		if err != nil {
-			llog.Fatal("err calling disk", llog.KV{"err": err})
+			llog.Fatal("err calling disk", llog.ErrKV(err))
 		}
 		for _, d := range dd {
 			llog.Info("disk usage stats", llog.KV(d))
@@ -215,7 +215,7 @@ func diskIOLoop(ch <-chan time.Time) {
 	devList := func() []string {
 		dd, err := disk()
 		if err != nil {
-			llog.Fatal("err calling disk", llog.KV{"err": err})
+			llog.Fatal("err calling disk", llog.ErrKV(err))
 		}
 
 		devs := make([]string, 0, len(dd))
@@ -230,7 +230,7 @@ func diskIOLoop(ch <-chan time.Time) {
 	var doPrint bool
 	for range ch {
 		if full, diff, err = diskDiff(full, devList()); err != nil {
-			llog.Fatal("err calling diskDiff", llog.KV{"err": err})
+			llog.Fatal("err calling diskDiff", llog.ErrKV(err))
 		}
 
 		if doPrint {
@@ -249,7 +249,7 @@ func netLoop(ch <-chan time.Time) {
 	var err error
 	for range ch {
 		if full, diff, err = netDiff(full); err != nil {
-			llog.Fatal("err calling netDiff", llog.KV{"err": err})
+			llog.Fatal("err calling netDiff", llog.ErrKV(err))
 		}
 
 		for dev, d := range diff {
@@ -291,13 +291,11 @@ func pingLoop(ch <-chan time.Time, hosts []string, count int) {
 
 		for i := range proms {
 			pr := <-proms[i]
+			kv := llog.KV{"host": hosts[i]}
 			if pr.err != nil {
-				llog.Warn("ping failed", llog.KV{"host": hosts[i], "err": pr.err})
+				llog.Warn("ping failed", kv, llog.ErrKV(pr.err))
 			} else {
-				llog.Info("ping result", llog.KV{
-					"host":   hosts[i],
-					"tookMS": pr.d.Seconds() * 1e3,
-				})
+				llog.Info("ping result", kv.Set("tookMS", pr.d.Seconds()*1e3))
 			}
 		}
 	}
