@@ -267,7 +267,7 @@ type pingRes struct {
 }
 
 func pingPromise(count int, addr string) chan pingRes {
-	ch := make(chan pingRes)
+	ch := make(chan pingRes, 1)
 	go func() {
 		start := time.Now()
 		err := exec.Command("ping", "-c"+strconv.Itoa(count), "-w5", addr).Run()
@@ -295,7 +295,12 @@ func pingLoop(ch <-chan time.Time, hosts []string, count int) {
 			if pr.err != nil {
 				llog.Warn("ping failed", kv, llog.ErrKV(pr.err))
 			} else {
-				llog.Info("ping result", kv.Set("tookMS", pr.d.Seconds()*1e3))
+				took := int64(pr.d / time.Millisecond)
+				tkv := llog.KV{
+					"tookMS":    took,
+					"tookMSAvg": took / int64(count),
+				}
+				llog.Info("ping result", kv, tkv)
 			}
 		}
 	}
