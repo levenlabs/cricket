@@ -55,10 +55,14 @@ mean:
   account for interfaces being added and removed.
 
 * `disk io stats (diff)` - Displays the number of events, with on event type per
-  field, which have occured since the last `disk io stats (diff)` message. One
+  field, which have occurred since the last `disk io stats (diff)` message. One
   message is displayed per partition. It is *not* necessary to restart cricket
   to account for interfaces being added and removed.
 
   See the */proc/diskstats* section on the [proc man page][proc] for more details.
+
+* `ping result` - Displays the average ping time to a host. By default this stat
+  will not be used, but it can be enabled using `--ping-hosts`. It require's
+  superuser to work, or you can use `setcap cap_net_raw=+ep` on the binary.
 
 [proc]: http://man7.org/linux/man-pages/man5/proc.5.html

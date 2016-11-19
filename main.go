@@ -1,13 +1,13 @@
 package main
 
 import (
-	"os/exec"
-	"strconv"
+	"errors"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/levenlabs/go-llog"
+	ping "github.com/levenlabs/go-ping"
 	"github.com/mediocregopher/lever"
 )
 
@@ -269,15 +269,21 @@ type pingRes struct {
 func pingPromise(count int, addr string) chan pingRes {
 	ch := make(chan pingRes, 1)
 	go func() {
-		start := time.Now()
-		err := exec.Command("ping", "-c"+strconv.Itoa(count), "-w5", addr).Run()
+		p, err := ping.NewPinger(addr)
 		if err != nil {
 			ch <- pingRes{err: err}
 			return
 		}
-		ch <- pingRes{
-			d: time.Since(start) / time.Duration(count),
+		p.Count = count
+		p.SetPrivileged(true)
+		p.OnFinish = func(stats *ping.Statistics) {
+			if stats.PacketsRecv == 0 {
+				ch <- pingRes{err: errors.New("no pings completed")}
+			} else {
+				ch <- pingRes{d: stats.AvgRtt}
+			}
 		}
+		p.Run()
 	}()
 	return ch
 }
@@ -295,10 +301,10 @@ func pingLoop(ch <-chan time.Time, hosts []string, count int) {
 			if pr.err != nil {
 				llog.Warn("ping failed", kv, llog.ErrKV(pr.err))
 			} else {
-				took := int64(pr.d / time.Millisecond)
+				// convert to int because if it's left a float there's a ton of
+				// trailing decimals in the log
 				tkv := llog.KV{
-					"tookMS":    took,
-					"tookMSAvg": took / int64(count),
+					"tookMSAvg": int64(pr.d / time.Millisecond),
 				}
 				llog.Info("ping result", kv, tkv)
 			}
